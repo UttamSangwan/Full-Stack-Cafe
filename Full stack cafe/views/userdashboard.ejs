@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Full Stack Cafe | Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;800&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Plus Jakarta Sans', sans-serif; }
+        .custom-scrollbar::-webkit-scrollbar { width: 6px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #e5e7eb; border-radius: 10px; }
+        .category-card:hover { transform: translateY(-5px); transition: all 0.3s ease; }
+        .scrollbar-hide::-webkit-scrollbar { display: none; }
+    </style>
+</head>
+<body class="bg-gray-50">
+
+<div id="status-notification" class="fixed top-24 right-5 z-[150] bg-rose-600 text-white px-6 py-4 rounded-2xl shadow-2xl transition-all duration-500 transform translate-x-[150%] flex items-center gap-4 border border-rose-400">
+    <div class="bg-white/20 p-2 rounded-xl text-xl">🔥</div>
+    <div>
+        <p class="font-bold text-sm">Order Update!</p>
+        <p id="notification-msg" class="text-xs opacity-90 font-medium"></p>
+    </div>
+    <button onclick="closeNotification()" class="ml-2 text-white/50 hover:text-white">✕</button>
+</div>
+
+<nav class="bg-rose-500 text-white px-6 py-4 sticky top-0 z-50 shadow-lg">
+    <div class="max-w-7xl mx-auto flex justify-between items-center">
+        <div class="font-extrabold text-2xl tracking-tighter">
+            <a href="/dashboard?user=<%= encodeURIComponent(user) %>" class="hover:opacity-90 transition-opacity">FULL STACK CAFE 🍔</a>
+        </div>
+        
+        <div class="flex items-center gap-4 md:gap-6">
+            <% if (user) { %>
+                <div class="hidden md:block">
+                    <span class="opacity-80">Welcome,</span>
+                    <span class="font-bold"><%= user %></span>
+                </div>
+                
+                <button onclick="showHistory()" class="flex items-center justify-center bg-white/20 hover:bg-white/30 p-2 md:px-4 md:py-2 rounded-xl transition-all font-semibold border border-white/30">
+                    <span class="md:mr-2">📜</span> <span class="hidden md:inline">History</span>
+                </button>
+
+                <button onclick="toggleCart()" class="bg-white text-rose-500 px-4 py-2 rounded-xl font-bold flex items-center gap-2 shadow-md hover:scale-105 transition-transform">
+                    🛒 <span id="nav-cart-count" class="bg-rose-500 text-white text-xs px-2 py-0.5 rounded-full">0</span>
+                </button>
+
+                <a href="/login" class="text-sm font-bold border-b-2 border-transparent hover:border-white transition-all">Logout</a>
+            <% } else { %>
+                <a href="/login" class="font-bold">Login</a>
+                <a href="/signup" class="bg-white text-rose-500 px-4 py-2 rounded-xl font-bold shadow-md">Signup</a>
+            <% } %>
+        </div>
+    </div>
+</nav>
+
+<main class="max-w-7xl mx-auto p-6 lg:p-10">
+    <div class="mb-12">
+        <h1 class="text-5xl font-extrabold text-gray-900 tracking-tight">Delicious food, <br><span class="text-rose-500">delivered to you.</span></h1>
+    </div>
+
+    <div class="flex gap-3 mb-12 overflow-x-auto pb-2 scrollbar-hide">
+        <button onclick="filterCategory('all', event)" class="filter-btn whitespace-nowrap px-8 py-3 rounded-2xl font-bold bg-gray-900 text-white shadow-xl transition-all">All Items</button>
+        <% if (locals.categories) { %>
+            <% categories.forEach(cat => { %>
+                <button onclick="filterCategory('<%= cat.name %>', event)" class="filter-btn whitespace-nowrap px-8 py-3 rounded-2xl font-bold bg-white text-gray-500 border border-gray-200 hover:bg-gray-100 transition-all">
+                    <%= cat.name %>
+                </button>
+            <% }) %>
+        <% } %>
+    </div>
+
+    <div id="menu-container" class="space-y-16">
+        <% if (locals.categories && categories.length > 0) { %>
+            <% categories.forEach(category => { %>
+                <section class="category-section" data-category="<%= category.name %>">
+                    <h2 class="text-2xl font-extrabold text-gray-800 mb-8 flex items-center gap-3">
+                        <span class="w-2 h-8 bg-rose-500 rounded-full"></span>
+                        <%= category.name %>
+                    </h2>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
+                        <% category.items.forEach(item => { %>
+                            <div class="category-card bg-white rounded-[2.5rem] p-6 shadow-sm border border-gray-100 hover:shadow-2xl flex flex-col justify-between">
+                                <div>
+                                    <div class="h-44 w-full bg-gray-100 rounded-[2rem] overflow-hidden mb-6 flex items-center justify-center">
+                                        <% if (item.img) { %>
+                                            <img src="<%= item.img %>" alt="<%= item.name %>" class="w-full h-full object-cover">
+                                        <% } else { %>
+                                            <span class="text-5xl">🍽️</span>
+                                        <% } %>
+                                    </div>
+                                    <h3 class="text-xl font-bold text-gray-800 mb-1 px-2"><%= item.name %></h3>
+                                    <p class="text-gray-400 text-sm px-2 mb-4">Freshly prepared</p>
+                                </div>
+                                <div class="flex justify-between items-center pt-4 border-t border-gray-50 px-2">
+                                    <span class="text-2xl font-extrabold text-gray-900">$<%= item.price.toFixed(2) %></span>
+                                    <button onclick="addToCart('<%= item.name.replace(/'/g, "\\'") %>', <%= item.price %>)" 
+                                            class="bg-rose-500 text-white p-4 rounded-2xl hover:bg-rose-600 active:scale-90 transition-all shadow-lg shadow-rose-200">
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M12 4v16m8-8H4" />
+                                        </svg>
+                                    </button>
+                                </div>
+                            </div>
+                        <% }) %>
+                    </div>
+                </section>
+            <% }) %>
+        <% } %>
+    </div>
+</main>
+
+<div id="cart-modal" class="fixed inset-0 bg-gray-900/60 backdrop-blur-md z-[100] hidden items-center justify-center p-4">
+    <div class="bg-white w-full max-w-md rounded-[3rem] p-10 relative shadow-2xl">
+        <button onclick="toggleCart()" class="absolute top-8 right-8 text-gray-400 hover:text-black transition-colors font-bold">✕</button>
+        <h2 class="text-3xl font-extrabold mb-8">My Cart 🛒</h2>
+        <div id="cart-items-list" class="space-y-4 max-h-72 overflow-y-auto mb-8 pr-2 custom-scrollbar"></div>
+        <div class="border-t border-gray-100 pt-6">
+            <div class="flex justify-between items-center mb-8">
+                <span class="text-gray-500 font-semibold">Total Amount</span>
+                <span id="cart-total" class="text-3xl font-extrabold text-rose-500">$0.00</span>
+            </div>
+            <button onclick="checkout()" class="w-full bg-rose-500 text-white py-5 rounded-2xl font-extrabold text-lg hover:bg-rose-600 transition-all shadow-xl shadow-rose-200">
+                Proceed to Checkout
+            </button>
+        </div>
+    </div>
+</div>
+
+<div id="history-modal" class="fixed inset-0 bg-gray-900/60 backdrop-blur-md z-[110] hidden items-center justify-center p-4">
+    <div class="bg-white w-full max-w-2xl rounded-[3rem] p-10 relative shadow-2xl">
+        <button onclick="toggleHistory()" class="absolute top-8 right-8 text-gray-400 font-bold">✕</button>
+        <h2 class="text-3xl font-extrabold mb-8">Order History 📜</h2>
+        <div id="history-list" class="space-y-4 max-h-[450px] overflow-y-auto pr-2 custom-scrollbar"></div>
+    </div>
+</div>
+
+<script>
+    let userCart = JSON.parse(localStorage.getItem('cafeCart')) || [];
+    let lastKnownStatus = {}; // Tracks status to prevent repeating notifications
+
+    window.onload = () => {
+        updateCartUI();
+        startNotificationPoller();
+    };
+
+    function addToCart(name, price) {
+        userCart.push({ name, price: parseFloat(price) });
+        localStorage.setItem('cafeCart', JSON.stringify(userCart));
+        updateCartUI();
+        const cartBtn = document.querySelector('button[onclick="toggleCart()"]');
+        cartBtn.classList.add('scale-110');
+        setTimeout(() => cartBtn.classList.remove('scale-110'), 200);
+    }
+
+    function updateCartUI() {
+        const count = document.getElementById('nav-cart-count');
+        const list = document.getElementById('cart-items-list');
+        const totalDisp = document.getElementById('cart-total');
+        count.innerText = userCart.length;
+        let total = 0;
+        if (userCart.length === 0) {
+            list.innerHTML = `<div class="text-center py-10 text-gray-400 italic">Your cart is empty...</div>`;
+            totalDisp.innerText = "$0.00";
+        } else {
+            list.innerHTML = userCart.map((item, i) => {
+                total += item.price;
+                return `
+                    <div class="flex justify-between items-center bg-gray-50 p-4 rounded-2xl border border-gray-100">
+                        <span class="font-bold text-gray-800">${item.name}</span>
+                        <div class="flex items-center gap-4">
+                            <span class="font-extrabold text-rose-500">$${item.price.toFixed(2)}</span>
+                            <button onclick="removeFromCart(${i})" class="text-gray-300 hover:text-red-500 transition-colors">✕</button>
+                        </div>
+                    </div>`;
+            }).join('');
+            totalDisp.innerText = `$${total.toFixed(2)}`;
+        }
+    }
+
+    function removeFromCart(i) {
+        userCart.splice(i, 1);
+        localStorage.setItem('cafeCart', JSON.stringify(userCart));
+        updateCartUI();
+    }
+
+    function toggleCart() {
+        const modal = document.getElementById('cart-modal');
+        modal.classList.toggle('hidden');
+        modal.classList.toggle('flex');
+    }
+
+    function toggleHistory() {
+        const modal = document.getElementById('history-modal');
+        modal.classList.toggle('hidden');
+        modal.classList.toggle('flex');
+    }
+
+    function checkout() {
+        if (userCart.length === 0) return alert("Your cart is empty!");
+        window.location.href = `/order-summary?user=<%= encodeURIComponent(user) %>`;
+    }
+
+    async function showHistory() {
+        toggleHistory();
+        const list = document.getElementById('history-list');
+        list.innerHTML = `<div class="text-center py-10 animate-pulse text-gray-400">Syncing with kitchen...</div>`;
+        try {
+            const res = await fetch(`/api/order-history?user=<%= encodeURIComponent(user) %>`);
+            const orders = await res.json();
+            if (!orders || orders.length === 0) {
+                list.innerHTML = `<p class="text-center text-gray-400 py-10">You haven't ordered anything yet!</p>`;
+                return;
+            }
+            list.innerHTML = orders.map(o => {
+                let statusColor = "bg-orange-100 text-orange-600 border-orange-200";
+                if(o.status === "Completed") statusColor = "bg-green-100 text-green-600 border-green-200";
+                if(o.status === "Preparing") statusColor = "bg-blue-100 text-blue-600 border-blue-200";
+                return `
+                <div class="bg-gray-50 p-6 rounded-[2rem] border border-gray-100 mb-4 shadow-sm">
+                    <div class="flex justify-between items-start mb-4">
+                        <div>
+                            <p class="text-[10px] text-gray-400 font-bold uppercase tracking-widest mb-1">${new Date(o.createdAt).toLocaleString()}</p>
+                            <p class="font-extrabold text-xl text-gray-800">$${o.total.toFixed(2)}</p>
+                        </div>
+                        <span class="px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest border ${statusColor}">
+                            ${o.status}
+                        </span>
+                    </div>
+                    <div class="flex flex-wrap gap-2">
+                        ${o.items.map(item => `<span class="bg-white px-3 py-1 rounded-lg text-[10px] border border-gray-200 text-gray-500 font-bold">${item}</span>`).join('')}
+                    </div>
+                </div>`;
+            }).join('');
+        } catch (err) {
+            list.innerHTML = `<div class="text-red-500 text-center py-10 font-bold">Failed to load history.</div>`;
+        }
+    }
+
+    // --- NOTIFICATION LOGIC ---
+    function startNotificationPoller() {
+        // Initial check and then check every 10 seconds
+        checkStatus();
+        setInterval(checkStatus, 10000);
+    }
+
+    async function checkStatus() {
+        try {
+            const res = await fetch(`/api/order-history?user=<%= encodeURIComponent(user) %>`);
+            const orders = await res.json();
+            
+            if (orders && orders.length > 0) {
+                const latestOrder = orders[0]; // Check the most recent order
+                
+                // If status changed and it's not "Pending"
+                if (latestOrder.status !== "Pending" && lastKnownStatus[latestOrder._id] !== latestOrder.status) {
+                    showNotification(`Your order is now: ${latestOrder.status}`);
+                    lastKnownStatus[latestOrder._id] = latestOrder.status;
+                }
+            }
+        } catch (e) { console.log("Status check failed"); }
+    }
+
+    function showNotification(msg) {
+        const notifyEl = document.getElementById('status-notification');
+        const msgEl = document.getElementById('notification-msg');
+        msgEl.innerText = msg;
+        
+        notifyEl.classList.remove('translate-x-[150%]');
+        setTimeout(closeNotification, 6000); // Auto hide
+    }
+
+    function closeNotification() {
+        document.getElementById('status-notification').classList.add('translate-x-[150%]');
+    }
+
+    function filterCategory(cat, e) {
+        const target = cat.toLowerCase();
+        document.querySelectorAll('.filter-btn').forEach(btn => {
+            btn.classList.remove('bg-gray-900', 'text-white', 'shadow-xl');
+            btn.classList.add('bg-white', 'text-gray-500');
+        });
+        e.currentTarget.classList.add('bg-gray-900', 'text-white', 'shadow-xl');
+        e.currentTarget.classList.remove('bg-white', 'text-gray-500');
+
+        document.querySelectorAll('.category-section').forEach(sec => {
+            sec.style.display = (target === 'all' || sec.dataset.category.toLowerCase() === target) ? 'block' : 'none';
+        });
+    }
+</script>
+</body>
+</html>

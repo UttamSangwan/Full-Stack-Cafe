@@ -1,0 +1,160 @@
+<%- include('partials/_header') %>
+<%- include('partials/_navbar') %>
+
+<input type="hidden" id="auth-user" value="<%= user %>">
+
+<main class="max-w-4xl mx-auto p-6 lg:p-12">
+    <div class="mb-8">
+        <a href="/dashboard?user=<%= encodeURIComponent(user) %>" class="text-rose-500 font-bold flex items-center gap-2 hover:translate-x-[-4px] transition-transform w-fit">
+            ← Back to Menu
+        </a>
+        <h1 class="text-4xl font-black text-gray-800 mt-4 tracking-tight">Order Summary</h1>
+        <p class="text-gray-500 font-medium">Review your items before we start cooking!</p>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-10">
+        <div class="lg:col-span-2 space-y-4" id="checkout-list">
+            </div>
+
+        <div class="bg-white p-8 rounded-[2.5rem] shadow-xl border border-gray-100 h-fit sticky top-6">
+            <h2 class="text-xl font-bold mb-6 text-gray-800">Bill Details</h2>
+            <div class="space-y-4">
+                <div class="flex justify-between text-gray-500 font-medium">
+                    <span>Subtotal</span>
+                    <span id="subtotal" class="text-gray-800">$0.00</span>
+                </div>
+                <div class="flex justify-between text-gray-500 font-medium">
+                    <span>Tax (10%)</span>
+                    <span id="tax" class="text-gray-800">$0.00</span>
+                </div>
+                <div class="h-px bg-gray-100 w-full my-2"></div>
+                <div class="flex justify-between items-center text-2xl font-black text-gray-900">
+                    <span>Total</span>
+                    <span id="final-total" class="text-rose-500">$0.00</span>
+                </div>
+            </div>
+            
+            <button id="confirm-btn" onclick="confirmOrder()" class="w-full mt-8 bg-gray-900 text-white py-5 rounded-2xl font-bold hover:bg-rose-600 transition-all shadow-xl shadow-rose-100 active:scale-95 flex items-center justify-center gap-3 group">
+                <span id="btn-text">Confirm & Pay</span>
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 group-hover:translate-x-1 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3" />
+                </svg>
+            </button>
+
+            <p class="text-[10px] text-gray-400 text-center mt-4 uppercase tracking-widest font-bold">Secure Checkout</p>
+        </div>
+    </div>
+</main>
+
+<script>
+    let cart = JSON.parse(localStorage.getItem('cafeCart')) || [];
+
+    function renderCheckout() {
+        const list = document.getElementById('checkout-list');
+        const activeUser = document.getElementById('auth-user').value;
+
+        if (cart.length === 0) {
+            alert("Your cart is empty. Redirecting to menu...");
+            window.location.href = `/dashboard?user=${encodeURIComponent(activeUser)}`;
+            return;
+        }
+
+        let subtotal = 0;
+        list.innerHTML = cart.map((item, index) => {
+            subtotal += item.price;
+            return `
+                <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 flex justify-between items-center group hover:border-rose-200 transition-colors">
+                    <div class="flex items-center gap-5">
+                        <div class="bg-rose-50 p-4 rounded-2xl text-2xl group-hover:scale-110 transition-transform">🍽️</div>
+                        <div>
+                            <h3 class="font-bold text-gray-800 text-lg">${item.name}</h3>
+                            <p class="text-rose-500 font-extrabold">$${item.price.toFixed(2)}</p>
+                        </div>
+                    </div>
+                    <button onclick="removeItem(${index})" class="text-gray-300 hover:text-red-500 p-2 transition-colors">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                        </svg>
+                    </button>
+                </div>`;
+        }).join('');
+
+        const tax = subtotal * 0.1;
+        const final = subtotal + tax;
+        
+        document.getElementById('subtotal').innerText = `$${subtotal.toFixed(2)}`;
+        document.getElementById('tax').innerText = `$${tax.toFixed(2)}`;
+        document.getElementById('final-total').innerText = `$${final.toFixed(2)}`;
+    }
+    
+
+    function removeItem(index) {
+        cart.splice(index, 1);
+        localStorage.setItem('cafeCart', JSON.stringify(cart));
+        renderCheckout();
+    }
+
+    async function confirmOrder() {
+        const btn = document.getElementById('confirm-btn');
+        const btnText = document.getElementById('btn-text');
+        const activeUser = document.getElementById('auth-user').value.trim();
+
+        if (!activeUser || activeUser === "" || activeUser === "null") {
+            alert("🔒 Security: Please login to place your order.");
+            window.location.href = "/login";
+            return;
+        }
+
+        const subtotal = cart.reduce((s, i) => s + i.price, 0);
+        const finalTotal = (subtotal * 1.1).toFixed(2);
+
+        // Prepare data matching the backend expectations
+        const orderData = {
+            user: activeUser,
+            items: cart.map(i => i.name), 
+            total: finalTotal
+        };
+
+        try {
+            btn.disabled = true;
+            btn.classList.add('opacity-50', 'cursor-not-allowed');
+            btnText.innerHTML = "Processing Order...";
+
+            const response = await fetch('/place-order', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(orderData)
+            });
+
+            // Handle the 500 error or 404 error from the server
+            if (!response.ok) {
+                const errData = await response.json();
+                throw new Error(errData.message || "Server Error");
+            }
+
+            const result = await response.json();
+            
+            if (result.success) {
+                localStorage.removeItem('cafeCart'); 
+                alert("🎉 Order received! We're preparing your food.");
+                // Use encodeURIComponent here too
+                window.location.href = `/dashboard?user=${encodeURIComponent(activeUser)}`;
+            } else {
+                alert("❌ " + (result.message || "Something went wrong."));
+                resetButton(btn, btnText);
+            }
+        } catch (err) {
+            console.error("Order error:", err);
+            alert("❌ Order Failed: " + err.message);
+            resetButton(btn, btnText);
+        }
+    }
+
+    function resetButton(btn, textElement) {
+        btn.disabled = false;
+        btn.classList.remove('opacity-50', 'cursor-not-allowed');
+        textElement.innerHTML = "Confirm & Pay";
+    }
+
+    document.addEventListener('DOMContentLoaded', renderCheckout);
+</script>

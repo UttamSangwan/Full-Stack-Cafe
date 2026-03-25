@@ -1,0 +1,77 @@
+<%- include('partials/_header') %>
+<input type="hidden" id="auth-user" value="<%= user %>">
+
+<main class="max-w-4xl mx-auto p-6 lg:p-12">
+    <div class="mb-8">
+        <a href="/dashboard?user=<%= encodeURIComponent(user || '') %>" class="text-rose-500 font-bold hover:underline">← Back to Menu</a>
+        <h1 class="text-4xl font-black text-gray-800 mt-4 tracking-tight">Order Summary</h1>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-10">
+        <div class="lg:col-span-2 space-y-4" id="checkout-list"></div>
+
+        <div class="bg-white p-8 rounded-[2.5rem] shadow-xl border border-gray-100 h-fit sticky top-6">
+            <h2 class="text-xl font-bold mb-6">Bill Details</h2>
+            <div class="space-y-4">
+                <div class="flex justify-between text-gray-500 font-medium"><span>Subtotal</span><span id="subtotal">$0.00</span></div>
+                <div class="flex justify-between text-gray-500 font-medium"><span>Tax (10%)</span><span id="tax">$0.00</span></div>
+                <div class="h-px bg-gray-100 w-full my-2"></div>
+                <div class="flex justify-between items-center text-2xl font-black text-gray-900"><span>Total</span><span id="final-total" class="text-rose-500">$0.00</span></div>
+            </div>
+            <button id="confirm-btn" onclick="confirmOrder()" class="w-full mt-8 bg-gray-900 text-white py-5 rounded-2xl font-bold hover:bg-rose-600 transition-all shadow-xl">Confirm & Pay</button>
+        </div>
+    </div>
+</main>
+
+<script>
+    let cart = JSON.parse(localStorage.getItem('cafeCart')) || [];
+
+    function renderCheckout() {
+        const list = document.getElementById('checkout-list');
+        const activeUser = document.getElementById('auth-user').value;
+        if (cart.length === 0) return window.location.href = "/dashboard";
+
+        let subtotal = 0;
+        list.innerHTML = cart.map((item, index) => {
+            const itemTotal = item.price * item.quantity;
+            subtotal += itemTotal;
+            return `<div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 flex justify-between items-center">
+                <div class="flex items-center gap-5"><div class="bg-rose-50 p-4 rounded-2xl text-2xl">🍽️</div>
+                <div><h3 class="font-bold text-gray-800 text-lg">${item.name} <span class="text-gray-400 text-sm ml-2">x ${item.quantity}</span></h3><p class="text-rose-500 font-extrabold">$${itemTotal.toFixed(2)}</p></div></div>
+                <button onclick="removeItem(${index})" class="text-gray-300 hover:text-red-500 p-2">✕</button></div>`;
+        }).join('');
+
+        const tax = subtotal * 0.1;
+        document.getElementById('subtotal').innerText = `$${subtotal.toFixed(2)}`;
+        document.getElementById('tax').innerText = `$${tax.toFixed(2)}`;
+        document.getElementById('final-total').innerText = `$${(subtotal + tax).toFixed(2)}`;
+    }
+
+    function removeItem(index) { cart.splice(index, 1); localStorage.setItem('cafeCart', JSON.stringify(cart)); renderCheckout(); }
+
+    async function confirmOrder() {
+        const activeUser = document.getElementById('auth-user').value.trim();
+        const subtotal = cart.reduce((s, i) => s + (i.price * i.quantity), 0);
+        
+        const orderData = {
+            user: activeUser,
+            items: cart.map(i => `${i.name} (x${i.quantity})`),
+            total: (subtotal * 1.1).toFixed(2)
+        };
+
+        try {
+            const response = await fetch('/place-order', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(orderData)
+            });
+            const result = await response.json();
+            if (result.success) {
+                localStorage.removeItem('cafeCart');
+                alert("🎉 Success! Order placed.");
+                window.location.href = `/order-history?user=${encodeURIComponent(activeUser)}`;
+            }
+        } catch (err) { alert("Network Error."); }
+    }
+    document.addEventListener('DOMContentLoaded', renderCheckout);
+</script>
