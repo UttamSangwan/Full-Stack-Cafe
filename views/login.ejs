@@ -6,27 +6,24 @@
             <p class="text-rose-400 font-medium">Login to start ordering</p>
         </div>
 
-      <% if (locals.error) { %>
-    <div class="bg-rose-100 border border-rose-400 text-rose-700 px-4 py-3 rounded mb-6 text-sm text-center">
-        <%= error %>
-    </div>
-<% } %>
-        <form action="/login" method="POST" class="space-y-5">
+        <div id="messageBox" class="hidden px-4 py-3 rounded mb-6 text-sm text-center"></div>
+
+        <form id="loginForm" class="space-y-5">
             <div>
                 <label class="block text-sm font-semibold text-gray-700 mb-1">Username</label>
                 <input type="text" name="username" placeholder="Enter username" required
-                    class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-rose-500 outline-none">
+                    class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-rose-500 outline-none transition-all">
             </div>
 
             <div>
                 <label class="block text-sm font-semibold text-gray-700 mb-1">Password</label>
                 <input type="password" name="password" placeholder="••••••••" required
-                    class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-rose-500 outline-none">
+                    class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-rose-500 outline-none transition-all">
             </div>
 
-            <button type="submit" 
-                class="w-full bg-rose-500 hover:bg-rose-600 text-white font-bold py-3 rounded-lg shadow-lg transition-all active:scale-95">
-                Login
+            <button type="submit" id="submitBtn"
+                class="w-full bg-rose-500 hover:bg-rose-600 text-white font-bold py-3 rounded-lg shadow-lg transition-all active:scale-95 flex justify-center items-center">
+                <span>Login</span>
             </button>
         </form>
 
@@ -35,5 +32,67 @@
         </div>
     </div>
 </main>
+
+<script>
+    const loginForm = document.getElementById('loginForm');
+    const messageBox = document.getElementById('messageBox');
+    const submitBtn = document.getElementById('submitBtn');
+
+    loginForm.addEventListener('submit', async (e) => {
+        e.preventDefault(); // Stop page from refreshing
+
+        // UI Feedback: Disable button
+        submitBtn.disabled = true;
+        submitBtn.classList.add('opacity-70', 'cursor-not-allowed');
+        submitBtn.querySelector('span').textContent = 'Authenticating...';
+
+        // Collect Form Data
+        const formData = new FormData(loginForm);
+        const data = Object.fromEntries(formData.entries());
+
+        try {
+            const response = await fetch('/login', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(data)
+            });
+
+            const result = await response.json();
+
+            if (response.ok && result.success) {
+                // Success: Redirect based on server response
+                window.location.href = result.redirect;
+            } else {
+                // Error: Show message from server
+                showMessage(result.message || 'Invalid credentials', 'error');
+                resetButton();
+            }
+        } catch (error) {
+            console.error('Fetch error:', error);
+            showMessage('Connection lost. Please try again later.', 'error');
+            resetButton();
+        }
+    });
+
+    function showMessage(text, type) {
+        messageBox.textContent = text;
+        messageBox.classList.remove('hidden');
+        
+        if (type === 'error') {
+            messageBox.className = "bg-rose-100 border border-rose-400 text-rose-700 px-4 py-3 rounded mb-6 text-sm text-center block";
+        } else {
+            messageBox.className = "bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded mb-6 text-sm text-center block";
+        }
+    }
+
+    function resetButton() {
+        submitBtn.disabled = false;
+        submitBtn.classList.remove('opacity-70', 'cursor-not-allowed');
+        submitBtn.querySelector('span').textContent = 'Login';
+    }
+</script>
+
 </body>
 </html>

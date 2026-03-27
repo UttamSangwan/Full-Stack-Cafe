@@ -30,7 +30,7 @@ const MenuItem = mongoose.model('MenuItem', new mongoose.Schema({
     price: Number,
     category: String,
     img: String,
-    inStock: { type: Boolean, default: true } // Added this for the On/Off toggle
+    inStock: { type: Boolean, default: true }
 }), 'menuitems');
 
 // --- 3. MIDDLEWARE & SECURITY ---
@@ -49,17 +49,28 @@ const isAuthenticated = (req, res, next) => {
 // --- 4. ROUTES ---
 app.get('/login', (req, res) => res.render('login', { error: null }));
 
+/**
+ * UPDATED LOGIN ROUTE FOR FETCH
+ * Returns JSON instead of Redirecting/Rendering
+ */
 app.post('/login', async (req, res) => {
     const { username, password } = req.body;
     try {
         const user = await User.findOne({ username, password });
         if (user) {
-            const path = user.role === 'admin' ? '/admin' : '/dashboard';
-            res.redirect(`${path}?user=${encodeURIComponent(user.username)}`);
+            const redirectUrl = user.role === 'admin' ? '/admin' : '/dashboard';
+            // Send JSON response with the redirect path and username
+            res.status(200).json({ 
+                success: true, 
+                redirect: `${redirectUrl}?user=${encodeURIComponent(user.username)}` 
+            });
         } else {
-            res.render('login', { error: "Invalid credentials" });
+            // Send 401 Unauthorized with error message
+            res.status(401).json({ success: false, message: "Invalid username or password" });
         }
-    } catch (err) { res.status(500).send("Login Error"); }
+    } catch (err) { 
+        res.status(500).json({ success: false, message: "Server login error" }); 
+    }
 });
 
 app.get('/dashboard', async (req, res) => {
@@ -109,17 +120,15 @@ app.get('/admin', isAuthenticated, async (req, res) => {
     } catch (err) { res.status(500).send("Admin Panel Error"); }
 });
 
-// Fixed Toggle Stock Status (Changed 'Menu' to 'MenuItem')
 app.post('/admin/toggle-stock/:id', isAuthenticated, async (req, res) => {
     try {
         const item = await MenuItem.findById(req.params.id);
-        item.inStock = item.inStock !== false ? false : true;
+        item.inStock = !item.inStock;
         await item.save();
         res.redirect(`/admin?user=${encodeURIComponent(req.query.user)}`);
     } catch (err) { res.status(500).send("Toggle Error"); }
 });
 
-// Fixed Render Edit Page (Changed 'Menu' to 'MenuItem')
 app.get('/admin/edit-menu/:id', isAuthenticated, async (req, res) => {
     try {
         const item = await MenuItem.findById(req.params.id);
@@ -127,7 +136,6 @@ app.get('/admin/edit-menu/:id', isAuthenticated, async (req, res) => {
     } catch (err) { res.status(500).send("Item Not Found"); }
 });
 
-// Fixed Update Item logic
 app.post('/admin/update-menu/:id', isAuthenticated, async (req, res) => {
     try {
         const { name, price, category, img } = req.body;
